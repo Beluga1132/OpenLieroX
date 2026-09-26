@@ -1,9 +1,12 @@
 name: Master build
 
 # Runs whenever a PR is merged (i.e. a push lands) on a release branch.
-# It builds every platform by reusing the existing package-* pipelines,
+# It builds Linux and Windows by reusing the existing package-* pipelines,
 # then publishes a single GitHub prerelease per build, tagged with the
 # version. Releases from previous builds are left untouched.
+# macOS, Android, Docker, WebAssembly and the Play Store and website publishing
+# are left out in this fork: they fail here or publish to upstream's infrastructure.
+# Their workflows are kept and can be started by hand.
 on:
   push:
     branches:
@@ -13,21 +16,6 @@ permissions:
   contents: write
 
 jobs:
-  # Reuse the existing build pipelines. secrets: inherit lets the Android
-  # job reach the signing / Play Store secrets just like before.
-  android:
-    uses: ./.github/workflows/package-android.yml
-    secrets: inherit
-
-  # Publish to the Play Store only on merge,
-  # after the Android build has produced and uploaded the signed bundle,
-  # and only once the tests pass: a build with failing tests must not reach users.
-  # PRs build but never publish.
-  publish-google-play:
-    needs: [android, headless-tests]
-    uses: ./.github/workflows/publish-to-google-play.yaml
-    secrets: inherit
-
   linux-bundle:
     uses: ./.github/workflows/package-linux-bundle.yml
     secrets: inherit
@@ -36,28 +24,8 @@ jobs:
     uses: ./.github/workflows/package-linux-deb.yml
     secrets: inherit
 
-  mac:
-    uses: ./.github/workflows/package-mac.yml
-    secrets: inherit
-
   windows:
     uses: ./.github/workflows/package-windows.yml
-    secrets: inherit
-
-  wasm:
-    uses: ./.github/workflows/package-wasm.yml
-    secrets: inherit
-
-  # Publish the dedicated-server image to GHCR only on merge, and only once
-  # the tests pass: a build with failing tests must not reach ghcr.io.
-  # PRs build the image (via package-docker.yml's own pull_request trigger)
-  # but never publish it.
-  docker:
-    needs: [headless-tests]
-    permissions:
-      contents: read
-      packages: write
-    uses: ./.github/workflows/package-docker.yml
     secrets: inherit
 
   # Gate the release on the tests: a build with failing tests is not published;
@@ -67,7 +35,7 @@ jobs:
 
   release:
     name: Publish master prerelease
-    needs: [android, linux-bundle, linux-deb, mac, windows, wasm, headless-tests]
+    needs: [linux-bundle, linux-deb, windows, headless-tests]
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -110,9 +78,6 @@ jobs:
           - Branch: \`${GITHUB_REF_NAME}\`
           - Commit: ${GITHUB_SHA}
 
-          **macOS:** this build is not notarized, so on first launch Gatekeeper warns that OpenLieroX is from an "unidentified developer".
-          It is safe; allow it once with \`xattr -cr /path/to/OpenLieroX.app\`, then open it normally.
-          See [the README](https://github.com/openlierox/openlierox#macos-first-run).
           EOF
           )"
 
@@ -185,28 +150,3 @@ jobs:
             sleep "$delay"
             attempt=$((attempt + 1))
           done
-
-  # Once the release (with the -wasm.zip asset) is published, tell the website
-  # repo to refresh its playable web demo. That repo's update-wasm.yml listens
-  # for a repository_dispatch of type "update-wasm"; it pulls the just-published
-  # release, drops the new binaries into web-demo/, and its push redeploys the
-  # GitHub Pages site. This must run after "release" (not from package-wasm.yml)
-  # because the website fetches the published release, not the raw build artifact.
-  notify-website:
-    name: Trigger web-demo update
-    needs: [release]
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Dispatch update-wasm to the website repo
-        env:
-          # GITHUB_TOKEN can't reach another repo, so this needs a token with
-          # write access to openlierox/openlierox.github.io (a fine-grained PAT
-          # with Contents: write, or a classic token with the "repo" scope),
-          # stored as the WEBSITE_DISPATCH_TOKEN secret in this repo.
-          GH_TOKEN: ${{ secrets.WEBSITE_DISPATCH_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/openlierox/openlierox.github.io/dispatches \
-            -f event_type=update-wasm

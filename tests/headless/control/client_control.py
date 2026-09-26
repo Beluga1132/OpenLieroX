@@ -12,6 +12,8 @@ Environment variables:
 ``OLX_CLIENT_NAME``                   short label used in the emitted markers
 ``OLX_RUN_SECONDS``                   how long to keep observing
 ``OLX_LEAVE_SIGNAL_FILE``             once this file exists, disconnect and quit
+``OLX_CHAT_LINES``                    newline-separated chat lines to send once playing,
+                                      one per loop; then emits ``CHAT_DONE``
 ====================================  =========================================
 """
 
@@ -27,6 +29,7 @@ def main():
     name = os.environ.get("OLX_CLIENT_NAME", "client")
     leave_signal = os.environ.get("OLX_LEAVE_SIGNAL_FILE")
     emit_state = os.environ.get("OLX_EMIT_STATE")
+    chat_lines = [l for l in os.environ.get("OLX_CHAT_LINES", "").split("\n") if l]
     reached_playing = False
     combat = False
     prev_worms = set()
@@ -49,6 +52,10 @@ def main():
         if state == "Playing" and not reached_playing:
             emit("CLIENT[%s] PLAYING" % name)
             reached_playing = True
+        if reached_playing and chat_lines:
+            command('chatMsg "%s"' % chat_lines.pop(0))
+            if not chat_lines:
+                emit("CLIENT[%s] CHAT_DONE" % name)
         # Report this client's own view of every worm's state, so a test can
         # check it against the server's view and confirm the game state syncs.
         if reached_playing and emit_state:

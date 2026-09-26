@@ -71,8 +71,14 @@ Their fixes were then tested by compiling the changed functions on their own
 
 - `/login <password>` (`src/server/ChatCommand.cpp:750`) travels as plaintext chat over UDP,
   and failed attempts are not rate-limited or logged.
-- Fix: rate-limit and log failed logins, and kick after N failures.
-  Treat the password as visible to anyone on the path.
+- **Mitigated:** failed logins are now logged,
+  and after 5 failures from one IP within 10 minutes,
+  further attempts from it are refused until the window passes
+  (keyed by IP, so reconnecting doesn't reset it).
+  Covered by `tests/headless/test_login.py`.
+- Still open by design: the password is plain chat,
+  so treat it as visible to anyone on the network path,
+  and use one that isn't reused anywhere else.
 
 ### 5. Low: legacy C string functions
 
@@ -86,7 +92,9 @@ Their fixes were then tested by compiling the changed functions on their own
 - `.github/workflows` publish to Google Play, Docker and the upstream website,
   using secrets this fork doesn't have.
   In a private repo they will fail and use Actions minutes.
-  Disable Actions, or trim the workflows to `headless-tests.yml`.
+- **Fixed:** the master build now runs only the tests and the Linux, Debian and Windows builds,
+  and pull requests no longer run the macOS, Android, Docker or WebAssembly builds.
+  Those workflows are kept and can be started by hand from the Actions tab.
 
 ### 7. Info: agent instruction files
 

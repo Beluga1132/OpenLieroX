@@ -1,7 +1,9 @@
 name: Build WebAssembly
 
 on:
-  pull_request:
+  # Not run automatically in this fork (it fails or targets upstream's infrastructure);
+  # start it by hand from the Actions tab if needed.
+  workflow_dispatch:
   # Reusable: invoked by release-beta.yml on merges to master.
   workflow_call:
 
