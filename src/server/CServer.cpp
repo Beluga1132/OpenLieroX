@@ -269,17 +269,9 @@ void GameServer::ObtainExternalIP()
 	if (sExternalIP.size())
 		return;
 
-#if defined(__EMSCRIPTEN__)
-	// External IP is meaningless in the browser (no inbound socket to
-	// reach), and curl on Emscripten translates connect() into a
-	// WebSocket open against ws://www.openlierox.net which then fails
-	// noisily in the dev console. Skip the fetch for local games.
-	if (game.isLocalGame())
-		return;
-#endif
-
-	// TODO: use a config
-	tHttp2.RequestData("https://ipinfo.io/ip", tLXOptions->sHttpProxy);
+	// Don't ask a third-party service (was ipinfo.io) for our address;
+	// it is only used for the IP-to-country distance display.
+	sExternalIP = "0.0.0.0";
 }
 
 void GameServer::ProcessGetExternalIP()
