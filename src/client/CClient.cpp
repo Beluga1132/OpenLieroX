@@ -1092,6 +1092,13 @@ void CClient::SendPackets(bool sendPendingOnly)
 	if(game.isClient()) // in server mode, we call this from CServer::SendPackets
 		network.olxSend(sendPendingOnly);
 
+	// The channel is reset when starting a game fails (e.g. a map that doesn't load),
+	// like ReadPackets checks
+	if(cNetChan == NULL) {
+		bsUnreliable.Clear();
+		return;
+	}
+
 	if(!sendPendingOnly) {
 		// Playing packets
 		if(game.state >= Game::S_Preparing)
