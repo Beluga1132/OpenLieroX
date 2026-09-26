@@ -138,9 +138,8 @@ void Menu_MainFrame()
                 if( ev->iEventMsg == TBT_CLICKED ) {
 					PlaySoundSample(sfxGeneral.smpClick);
 				    Menu_MainShutdown();
-				    // Refresh the master server lists in the background so the
-				    // server list shown in the Internet menu is up to date.
-				    DownloadMasterServerListFiles();
+				    // Refresh the server list from the local cfg/masterservers.txt.
+				    ServerList::get()->updateList();
 				    Menu_NetInitialize();
 				    return;
                 }

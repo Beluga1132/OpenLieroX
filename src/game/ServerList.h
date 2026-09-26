@@ -219,8 +219,4 @@ public:
 };
 
 
-// Downloads the latest cfg/masterservers.txt and cfg/udpmasterservers.txt
-// from the OpenLieroX serverlist repository. Runs in the background.
-void DownloadMasterServerListFiles();
-
 #endif
