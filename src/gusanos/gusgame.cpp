@@ -317,9 +317,13 @@ void GusGame::think()
 				{
 					case eHole:
 					{
-						int index = Encoding::decode(*data, levelEffectList.size());
+						size_t index = Encoding::decode(*data, levelEffectList.size());
 						VectorD2<int> v = game.gameMap()->intVectorEncoding.decode<VectorD2<int> >(*data);
-						game.gameMap()->applyEffect( levelEffectList[index], v.x, v.y );
+						// decode() can return up to the next power of two, so check the range
+						if ( index < levelEffectList.size() )
+							game.gameMap()->applyEffect( levelEffectList[index], v.x, v.y );
+						else
+							errors << "eHole: invalid level effect index " << index << endl;
 					}
 					break;
 					

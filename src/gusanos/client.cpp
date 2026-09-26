@@ -140,9 +140,13 @@ void Client::Net_cbNodeRequest_Dynamic( Net_ConnID _id, Net_ClassID _requested_c
 		
 	}else if( _requested_class == Particle::classID )
 	{
-		int typeIndex = Encoding::decode(*_announcedata, partTypeList.size());
+		size_t typeIndex = Encoding::decode(*_announcedata, partTypeList.size());
 		CWormInputHandler* owner = gusGame.findPlayerWithID(_announcedata->getInt(32));
-		newParticle_requested(partTypeList[typeIndex], Vec(), Vec(), 1, owner, Angle());
+		// decode() can return up to the next power of two, so check the range
+		if ( typeIndex < partTypeList.size() )
+			newParticle_requested(partTypeList[typeIndex], Vec(), Vec(), 1, owner, Angle());
+		else
+			console.addLogMsg("* ERROR: INVALID PARTICLE TYPE IN NODE REQUEST");
 	}else
 	{
 		console.addLogMsg("* ERROR: INVALID DYNAMIC NODE REQUEST");
