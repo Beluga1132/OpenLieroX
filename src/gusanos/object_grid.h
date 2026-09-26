@@ -167,6 +167,7 @@ struct GridObjectList
 		const_iterator& operator++()
 		{
 			ptr = ptr->nextS_;
+			return *this;
 		}
 				
 		operator T const*() const
