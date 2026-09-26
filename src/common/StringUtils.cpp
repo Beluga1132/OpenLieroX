@@ -1123,7 +1123,7 @@ bool Compress( const std::string & in, std::string * out, bool noCompression )
 	return true;
 }
 
-bool Decompress( const std::string & in, std::string * out )
+bool Decompress( const std::string & in, std::string * out, size_t maxOut )
 {
 	*out = ""; //out->clear();
 	z_stream strm;
@@ -1152,6 +1152,13 @@ bool Decompress( const std::string & in, std::string * out )
 			return false;
 		};
 		out->append( buf, sizeof(buf) - strm.avail_out );
+		if( out->size() > maxOut )
+		{
+			// Likely a decompression bomb
+			inflateEnd(&strm);
+			out->clear();
+			return false;
+		}
 	} while( ret != Z_STREAM_END );
 
 	inflateEnd(&strm);
