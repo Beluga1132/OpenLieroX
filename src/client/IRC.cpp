@@ -970,16 +970,18 @@ bool InitializeIRC()
 		return false;
 	}
 
-	// Get the server
+	// Get the server; there is no built-in default,
+	// so without a configured server we never connect anywhere
 	FILE *fp = OpenGameFile("cfg/chatserver.txt", "r");
-	if (fp)  {
-		std::string addr = ReadUntil(fp, '/');
-		std::string chann = ReadUntil(fp, '\n');
-		fclose(fp);
-		return globalIRC->connect(addr, chann, tLXOptions->sLastSelectedPlayer);
-	} else { // Defaults
-		return globalIRC->connect("irc.quakenet.org", "#LieroX", tLXOptions->sLastSelectedPlayer);
-	}
+	if (!fp)
+		return false;
+	std::string addr = ReadUntil(fp, '/');
+	std::string chann = ReadUntil(fp, '\n');
+	fclose(fp);
+	TrimSpaces(addr);
+	if (addr.empty())
+		return false;
+	return globalIRC->connect(addr, chann, tLXOptions->sLastSelectedPlayer);
 }
 
 /////////////////////////
