@@ -18,6 +18,7 @@ so one script serves every scenario:
 ``OLX_WEAPON_SEL_TIME``      seconds before unready clients are kicked
 ``OLX_START_WHEN_WORMS``     worms that must be in the lobby before we start (default 1)
 ``OLX_RUN_SECONDS``          how long to keep the server loop alive
+``OLX_SERVER_PASSWORD``      admin password for ``/login`` (default: none)
 ===========================  =========================================
 """
 
@@ -50,6 +51,8 @@ def main():
         "GameOptions.Server.WeaponSelectionMaxTime":
             int(os.environ.get("OLX_WEAPON_SEL_TIME", "8")),
     }
+    if os.environ.get("OLX_SERVER_PASSWORD"):
+        settings["GameOptions.Network.Password"] = os.environ["OLX_SERVER_PASSWORD"]
     for key, value in settings.items():
         command('setvar %s "%s"' % (key, value))
 

@@ -13,12 +13,14 @@
 // Created 24/12/07
 // Karel Petranek
 
+#include <map>
 #include "StringUtils.h"
 #include "ChatCommand.h"
 #include "Protocol.h"
 #include "CServer.h"
 #include "game/CWorm.h"
 #include "CServerConnection.h"
+#include "CChannel.h"
 #include "CServerNetEngine.h"
 #include "OLXCommand.h"
 #include "CClient.h"
@@ -747,6 +749,35 @@ std::string ProcessSpectate(const std::vector<std::string>& params, int sender_i
 	return "";
 };
 
+// Failed /login attempts per remote address, to stop password guessing.
+// Reconnecting doesn't reset this, as it is keyed by IP, not by connection.
+struct LoginFailures {
+	int count;
+	AbsTime first;
+	LoginFailures() : count(0) {}
+};
+static std::map<std::string, LoginFailures> loginFailures;
+static const int MaxLoginFailures = 5;
+static const TimeDiff LoginFailureWindow = TimeDiff(600.0f);
+
+// The client's IP without its port, or "" for the local client
+static std::string LoginFailureKey(CServerConnection* cl)
+{
+	if (!cl || cl->isLocalClient() || !cl->getChannel())
+		return "";
+	NetworkAddr addr = cl->getChannel()->getAddress();
+	SetNetAddrPort(addr, 0);
+	return NetAddrToString(addr);
+}
+
+// Forget attempts older than the window, so a lockout expires
+static void ExpireLoginFailures(const std::string& key)
+{
+	std::map<std::string, LoginFailures>::iterator f = loginFailures.find(key);
+	if (f != loginFailures.end() && GetTime() - f->second.first > LoginFailureWindow)
+		loginFailures.erase(f);
+}
+
 std::string ProcessLogin(const std::vector<std::string>& params, int sender_id)
 {
 	// Param check
@@ -763,9 +794,30 @@ std::string ProcessLogin(const std::vector<std::string>& params, int sender_id)
 	if (!tLXOptions->sServerPassword.size())
 		return "The server has no password set, cannot log you in";
 
+	const std::string key = LoginFailureKey(w->getClient());
+	if (key != "")  {
+		ExpireLoginFailures(key);
+		if (loginFailures.count(key) && loginFailures[key].count >= MaxLoginFailures)  {
+			warnings << "login refused, too many failures from " << key
+				<< " (" << w->getName() << ")" << endl;
+			return "Too many failed logins, try again later";
+		}
+	}
+
 	// Check the password
-	if (params[0] != tLXOptions->sServerPassword)
+	if (params[0] != tLXOptions->sServerPassword)  {
+		if (key != "")  {
+			LoginFailures& f = loginFailures[key];
+			if (f.count == 0)
+				f.first = GetTime();
+			f.count++;
+			warnings << "failed login " << f.count << "/" << MaxLoginFailures
+				<< " from " << key << " (" << w->getName() << ")" << endl;
+		}
 		return "Invalid password";
+	}
+	if (key != "")
+		loginFailures.erase(key);
 
 	// All OK, authorize the worm
 	cServer->authorizeWorm(sender_id);
