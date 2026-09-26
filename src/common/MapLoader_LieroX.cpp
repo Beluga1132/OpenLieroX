@@ -35,8 +35,11 @@ class ML_LieroX : public MapLoad {
 	std::string format() { return id; }
 	std::string formatShort() { return "LX"; }
 
-	// 7 bytes per pixel of an 8192x8192 map, far above any real level
-	static const Uint64 MaxImageBytes = Uint64(8192) * 8192 * 7;
+	// Far above any real level (the largest shipped one is 1260x750)
+	static const Sint64 MaxSide = 8192;
+	static const Sint64 MaxArea = Sint64(4096) * 4096;
+	// 7 bytes per pixel, see LoadImageFormat
+	static const Uint64 MaxImageBytes = Uint64(MaxArea) * 7;
 
 	Result parseHeader(bool printErrors) {
 		// Header
@@ -59,6 +62,14 @@ class ML_LieroX : public MapLoad {
 		fread_endian<Sint32>(fp, (int&)Type);
 		Theme_Name = freadfixedcstr(fp, 32);
 		fread_endian<Sint32>(fp, (int&)numobj);
+
+		// The header decides how much we allocate (CMap::Create),
+		// and the file may come from a server, so bound it
+		if(head.width <= 0 || head.height <= 0 || head.width > MaxSide || head.height > MaxSide ||
+		   head.width * head.height > MaxArea) {
+			if(printErrors) errors << "CMap::Load: " << filename << " has an implausible size " << head.width << "x" << head.height << endl;
+			return false;
+		}
 		
 		return true;
 	}
