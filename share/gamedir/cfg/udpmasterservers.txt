@@ -1,2 +1,0 @@
-server.az2000.de:23450
-liero.1337.cx:23450
