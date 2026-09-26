@@ -12,6 +12,11 @@
 #include <list>
 #include <cstdlib>
 
+#if !defined(__APPLE__) && !defined(WIN32)
+#include <unistd.h>
+#include <sys/wait.h>
+#endif
+
 #ifdef __APPLE__
 #include <Carbon/Carbon.h>
 #include <CoreFoundation/CoreFoundation.h>
@@ -28,10 +33,48 @@
 
 #include "Debug.h"
 #include "LieroX.h"
+#include "StringUtils.h"
 
+
+// Links come from chat and HTML sent by other players and servers,
+// so only open plain web URLs.
+static bool IsSafeWebUrl(const std::string& url) {
+	const std::string lower = stringtolower(url);
+	if (lower.compare(0, 7, "http://") != 0 && lower.compare(0, 8, "https://") != 0)
+		return false;
+	for (size_t i = 0; i < url.size(); ++i)
+		if ((unsigned char)url[i] <= ' ' || url[i] == 127)
+			return false;
+	return true;
+}
+
+#if !defined(__APPLE__) && !defined(WIN32)
+// Run the first browser that exists with the URL as its only argument.
+// No shell is involved, so the URL can't inject commands.
+// We double-fork so the browser is reparented and we don't leave zombies.
+static void LaunchBrowser(const std::list<std::string>& browsers, const std::string& url) {
+	pid_t child = fork();
+	if (child < 0) {
+		warnings << "cannot fork to start a browser" << endl;
+		return;
+	}
+	if (child == 0) {
+		if (fork() != 0)
+			_exit(0);
+		for (std::list<std::string>::const_iterator it = browsers.begin(); it != browsers.end(); ++it)
+			execlp(it->c_str(), it->c_str(), url.c_str(), (char*)NULL);
+		_exit(127);
+	}
+	waitpid(child, NULL, 0);
+}
+#endif
 
 void OpenLinkInExternBrowser(const std::string& url) {
 	notes << "open in extern browser: " << url << endl;
+	if (!IsSafeWebUrl(url)) {
+		warnings << "not opening link, only http and https URLs are allowed: " << url << endl;
+		return;
+	}
 
 #if defined(__APPLE__)
 	// Thanks to Jooleem project (http://jooleem.sourceforge.net) for the code
@@ -53,11 +96,7 @@ void OpenLinkInExternBrowser(const std::string& url) {
 	ShellExecute(NULL, "open", url.c_str(), NULL, NULL, SW_MAXIMIZE);
 	
 #else
-	std::string browser = "";
-		
-	// test some browsers and take the first found		
 	std::list<std::string> browsers;
-
 	if (getenv("BROWSER") != NULL) {
 		std::string tmp = getenv("BROWSER");
 		if(tmp != "") browsers.push_back(tmp);
@@ -74,26 +113,7 @@ void OpenLinkInExternBrowser(const std::string& url) {
 	browsers.push_back("galeon");
 	browsers.push_back("netscape");
 
-	for (std::list<std::string>::const_iterator it = browsers.begin(); it != browsers.end(); ++it) {
-		// we have browser != "" here
-		if(((*it)[0] == '/' && ::system(("test -x " + *it).c_str()) == 0) ||
-			::system(("test -x /usr/bin/" + *it + " -o -x /usr/bin/X11/" + *it + " -o -x /usr/local/bin/" + *it).c_str()) == 0) {
-			browser = *it;
-			break;
-		}
-	}
-	
-	if(browser == "") {
-		warnings << "no browser found" << endl;
-		return;
-	} else
-		notes << "Using " << browser << " as your default browser" << endl;
-	
-	int r = ::system((browser + " " + url + " &").c_str());
-	if(r == -1)
-		warnings << "error when executing " << browser << endl;
-	else if(r > 0)
-		warnings << browser << " returned with error" << endl;
+	LaunchBrowser(browsers, url);
 #endif
 }
 
