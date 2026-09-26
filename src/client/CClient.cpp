@@ -504,6 +504,14 @@ void CClient::DownloadMod(const std::string &modname)
 	if (modname.size() == 0)
 		return;
 
+	// The name comes from the server and becomes a directory we unzip into,
+	// so it must be one plain, valid directory name
+	if (!CUdpFileDownloader::isPathValid(modname) || modname.find('/') != std::string::npos)  {
+		sDlError = "Invalid mod name from server: " + modname;
+		bDlError = true;
+		return;
+	}
+
 	// Check
 	if (!cHttpDownloader)  {
 		sDlError = "Could not initialize the downloader";
@@ -626,8 +634,8 @@ void CClient::FinishModDownloads()
 		{
 			const char * fname = zip_get_name(zipfile, f, 0);
 			// Check if file is valid and is inside mod dir and not already exist
-			if( fname == NULL || std::string(fname).find("..") != std::string::npos ||
-				stringtolower( fname ).find( stringtolower(sModDownloadName) ) != 0 ||
+			if( fname == NULL || !CUdpFileDownloader::isPathValid(fname) ||
+				stringtolower( fname ).find( stringtolower(sModDownloadName) + "/" ) != 0 ||
 				IsFileAvailable(fname, false) )
 				continue;
 			zip_file * fileInZip = zip_fopen_index(zipfile, f, 0);
