@@ -71,8 +71,16 @@ def test_dedicated_server_shutdown_not_blocked_by_registration(olx_binary, tmp_p
     (the process never exits) until the request is interruptible.
     """
     proxy = BlackHoleProxy()
+    home = tmp_path / "server"
+    # The shipped master server list is empty,
+    # so give this instance one to register with.
+    # All HTTP goes to the black hole proxy,
+    # so the reserved .invalid name is never resolved.
+    cfg = home / ".OpenLieroX" / "cfg"
+    cfg.mkdir(parents=True)
+    (cfg / "masterservers.txt").write_text("master.invalid\n")
     server = OlxInstance(
-        olx_binary, "server", str(tmp_path / "server"), SHUTDOWN_CONTROL,
+        olx_binary, "server", str(home), SHUTDOWN_CONTROL,
         env={
             "OLX_PORT": "23400",
             "OLX_HTTP_PROXY": "127.0.0.1:%d" % proxy.port,
