@@ -147,7 +147,9 @@ size_t			stringcaserfind(const std::string& text, const std::string& search_for)
 std::string		StripHtmlTags( const std::string & src );	// Also removes all "\r" and spaces at line beginning
 std::string		GetNextWord(std::string::const_iterator it, const std::string& str);
 bool 			Compress( const std::string & in, std::string * out, bool noCompression = false );	// Compress given string using zlib, noCompression will just add zlib header and checksum
-bool 			Decompress( const std::string & in, std::string * out );	// Decompress, returns false if checksum fails
+// Decompress, returns false if checksum fails
+// or the output would exceed maxOut (the input may come from a peer)
+bool 			Decompress( const std::string & in, std::string * out, size_t maxOut = 128 * 1024 * 1024 );
 size_t			StringChecksum( const std::string & data );
 bool			FileChecksum( const std::string & path, size_t * _checksum, size_t * _filesize );
 std::string		Base64Encode(const std::string &data);

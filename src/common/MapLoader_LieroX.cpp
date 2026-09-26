@@ -34,7 +34,13 @@ class ML_LieroX : public MapLoad {
 	PIVar(bool,false) ctf;
 	std::string format() { return id; }
 	std::string formatShort() { return "LX"; }
-	
+
+	// Far above any real level (the largest shipped one is 1260x750)
+	static const Sint64 MaxSide = 8192;
+	static const Sint64 MaxArea = Sint64(4096) * 4096;
+	// 7 bytes per pixel, see LoadImageFormat
+	static const Uint64 MaxImageBytes = Uint64(MaxArea) * 7;
+
 	Result parseHeader(bool printErrors) {
 		// Header
 		id = freadfixedcstr(fp, 32);
@@ -56,6 +62,14 @@ class ML_LieroX : public MapLoad {
 		fread_endian<Sint32>(fp, (int&)Type);
 		Theme_Name = freadfixedcstr(fp, 32);
 		fread_endian<Sint32>(fp, (int&)numobj);
+
+		// The header decides how much we allocate (CMap::Create),
+		// and the file may come from a server, so bound it
+		if(head.width <= 0 || head.height <= 0 || head.width > MaxSide || head.height > MaxSide ||
+		   head.width * head.height > MaxArea) {
+			if(printErrors) errors << "CMap::Load: " << filename << " has an implausible size " << head.width << "x" << head.height << endl;
+			return false;
+		}
 		
 		return true;
 	}
@@ -72,7 +86,20 @@ class ML_LieroX : public MapLoad {
 		EndianSwap(size);
 		fread_compat(destsize, sizeof(Uint32), 1, fp);
 		EndianSwap(destsize);
-		
+
+		// Sizes come from the (possibly downloaded) map file,
+		// so bound them before allocating:
+		// the image is Width*Height*7 bytes (see below),
+		// and zlib output can't be much smaller than its input.
+		const Uint64 expected = Uint64(head.width) * Uint64(head.height) * 7;
+		if( head.width <= 0 || head.height <= 0 || expected > MaxImageBytes ||
+			destsize > expected * 2 + 1024 * 1024 ||
+			size > Uint64(destsize) + Uint64(destsize) / 100 + 1024 )
+		{
+			errors("CMap::LoadImageFormat(): implausible image size in map header");
+			return false;
+		}
+
 		// Allocate the memory
 		std::vector<uint8_t> pSource(size);
 		std::vector<uint8_t> pDest(destsize);

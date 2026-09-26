@@ -33,7 +33,7 @@ public:
 		m_data = NULL; m_size = 0;
 	}
 	
-	size_t size() { return m_size; }
+	size_t size() const { return m_size; }
 	
 	SafeVector& operator=(const SafeVector& v) {
 		clear();
@@ -42,6 +42,7 @@ public:
 			m_data = new T[m_size];
 			for(size_t i = 0; i < m_size; ++i) m_data[i] = v.m_data[i];
 		}
+		return *this;
 	}
 	
 	void resize(size_t s) {

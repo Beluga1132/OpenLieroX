@@ -37,6 +37,8 @@ void test_OmfgScriptHugeNumberFirstToken();
 void test_LinenoiseRefreshLineZeroCols();
 void test_CShootListSpeedRoundtrip();
 void test_CShootListMultiRoundtrip();
+void test_DecompressRoundtrip();
+void test_DecompressRejectsBomb();
 
 int main() {
 	printf("Running OLX unit tests...\n");
@@ -60,6 +62,8 @@ int main() {
 	test_LinenoiseRefreshLineZeroCols();
 	test_CShootListSpeedRoundtrip();
 	test_CShootListMultiRoundtrip();
+	test_DecompressRoundtrip();
+	test_DecompressRejectsBomb();
 
 	if(g_olxTestFailures) {
 		printf("FAILED: %d check(s)\n", g_olxTestFailures);

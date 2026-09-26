@@ -4,7 +4,15 @@
 
 #include "ChallengeTable.h"
 
-#include <cstdlib>
+#include <random>
+
+
+// Unpredictable, so a client with a spoofed source address
+// cannot guess the challenge sent to that address
+static int NewChallengeNumber() {
+	std::random_device rd;
+	return (int)(rd() & 0x7fffffff);
+}
 
 
 int ChallengeTable_issue(challenge_t* slots, int count,
@@ -29,7 +37,7 @@ int ChallengeTable_issue(challenge_t* slots, int count,
 	}
 	if(slot < 0) return 0;  // count <= 0
 
-	slots[slot].iNum = (rand() << 16) ^ rand();
+	slots[slot].iNum = NewChallengeNumber();
 	slots[slot].Address = addr;
 	slots[slot].fTime = now;
 	slots[slot].sClientVersion = clientVersion;

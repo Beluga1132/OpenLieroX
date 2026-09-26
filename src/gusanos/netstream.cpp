@@ -41,9 +41,10 @@ struct NetControlIntern {
 	
 	// A raw data package structure. All Gusanos packages are of this kind.
 	struct DataPackage {
-		DataPackage() : type(Type(-1)), sendMode(eNet_ReliableOrdered), repRules(Net_REPRULE_NONE) {}
+		DataPackage() : type(GPT_Invalid), sendMode(eNet_ReliableOrdered), repRules(Net_REPRULE_NONE) {}
 
 		enum Type {
+			GPT_Invalid = -1,
 			GPT_NodeInit,
 			GPT_NodeRemove,
 			GPT_NodeEvent, /* eNet_EventUser */
