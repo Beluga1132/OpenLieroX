@@ -130,6 +130,12 @@ void LuaContext::init()
 	luaopen_table(*this);
 	luaopen_string(*this);
 	luaopen_math(*this);
+
+	// Mods are untrusted; don't let them read local files by path
+	lua_pushnil(*this);
+	lua_setglobal(*this, "dofile");
+	lua_pushnil(*this);
+	lua_setglobal(*this, "loadfile");
 }
 
 void LuaContext::reset()

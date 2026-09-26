@@ -1,2 +1,0 @@
-http://openlierox.net/file_ignore_case.php?fname=
-http://openlierox.svn.sourceforge.net/viewvc/*checkout*/openlierox/share/gamedir/levels/

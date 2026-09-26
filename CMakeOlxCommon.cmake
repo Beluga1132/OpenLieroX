@@ -139,7 +139,7 @@ INCLUDE_DIRECTORIES(BEFORE ${OLX_VERSION_INCLUDE_DIR})
 # also checked into the repo (share/gamedir/gamecontrollerdb.txt) so that
 # local/offline builds always have a working file: if the download is disabled
 # or fails, we keep that committed copy in place.
-OPTION(OLX_DOWNLOAD_GAMECONTROLLERDB "Download latest SDL gamecontrollerdb.txt at configure time (falls back to the committed copy on failure)" ON)
+OPTION(OLX_DOWNLOAD_GAMECONTROLLERDB "Download latest SDL gamecontrollerdb.txt at configure time (falls back to the committed copy on failure)" OFF)
 SET(OLX_GAMECONTROLLERDB_URL
 	"https://raw.githubusercontent.com/mdqinc/SDL_GameControllerDB/master/gamecontrollerdb.txt"
 	CACHE STRING "URL to fetch the SDL game controller mapping database from")

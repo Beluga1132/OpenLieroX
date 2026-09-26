@@ -31,6 +31,8 @@
 #include "EndianSwap.h"
 #include "FileDownload.h"
 #include "MathLib.h"
+#include "game/Settings.h"
+#include "game/Mod.h"
 
 
 
@@ -797,7 +799,7 @@ void CUdpFileDownloader::processFileRequests()
 		return;
 	if( sFilename == "GET:" )
 	{
-		if( ! isPathValid( getData() ) )
+		if( ! isPathServable( getData() ) )
 		{
 			notes << "CFileDownloaderInGame::processFileRequests(): invalid filename "<< getData() << endl;
 			return;
@@ -821,7 +823,7 @@ void CUdpFileDownloader::processFileRequests()
 	};
 	if( sFilename == "STAT:" )
 	{
-		if( ! isPathValid( getData() ) )
+		if( ! isPathServable( getData() ) )
 		{
 			notes << "CFileDownloaderInGame::processFileRequests(): invalid filename " << getData() << endl;
 			return;
@@ -898,7 +900,9 @@ bool CUdpFileDownloader::isPathValid( const std::string & path )
 		return false;
 	if( path.find_first_not_of( S_LETTER S_NUMBER S_SYMBOL S_UTF8_SYMBOL ) != std::string::npos )
 		return false;
-	if( path[0] == '/' || path[0] == ' ' )
+	// A leading dot would name a hidden file or dir (e.g. .ssh/);
+	// later components are covered by the "/." check below
+	if( path[0] == '/' || path[0] == ' ' || path[0] == '.' )
 		return false;
 	if( path[path.size()-1] == ' ' )
 		return false;
@@ -928,6 +932,21 @@ bool CUdpFileDownloader::isPathValid( const std::string & path )
 	};
 	return true;
 };
+
+// Peers may only fetch what they need to play:
+// maps, and the mod the game is currently using.
+// Anything else in the search paths (the working dir, logs, ...) stays private.
+bool CUdpFileDownloader::isPathServable( const std::string & path )
+{
+	if( ! isPathValid( path ) )
+		return false;
+	if( stringcasefind( path, "levels/" ) == 0 )
+		return true;
+	const std::string mod = gameSettings[FT_Mod].as<ModInfo>()->path;
+	if( mod.empty() || ! isPathValid( mod ) )
+		return false;
+	return stringcaseequal( path, mod ) || stringcasefind( path, mod + "/" ) == 0;
+}
 
 class StatFileList
 {

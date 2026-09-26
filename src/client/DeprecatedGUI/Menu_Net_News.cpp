@@ -54,18 +54,21 @@ bool Menu_Net_NewsInitialize()
 	cNews.Add( new CButton(BUT_REFRESH, tMenu->bmpButtons), nw_Refresh, 520,440, 50,15);
 	cNews.Add( new CBrowser(), nw_NewsBrowser, 50, 160, 540, 260);
 
-	// Get the news page
+	// Get the news page; there is no built-in default,
+	// so without a configured page nothing is fetched
+	strNewsPage = "";
 	FILE *fp = OpenGameFile("cfg/newsserver.txt", "r");
 	if (fp)  {
 		strNewsPage = ReadUntil(fp, '\n');
 		fclose(fp);
-	} else {
-		strNewsPage = "http://openlierox.sourceforge.net/news.php"; // Default
+		TrimSpaces(strNewsPage);
 	}
 
 	// Load the news
-	CBrowser *b = (CBrowser *)cNews.getWidget(nw_NewsBrowser);
-	b->LoadFromHTTP(strNewsPage);
+	if (!strNewsPage.empty())  {
+		CBrowser *b = (CBrowser *)cNews.getWidget(nw_NewsBrowser);
+		b->LoadFromHTTP(strNewsPage);
+	}
 
 
 	return true;
@@ -122,7 +125,8 @@ void Menu_Net_NewsFrame(int mouse)
 					// Click!
 					PlaySoundSample(sfxGeneral.smpClick);
 
-					((CBrowser *)cNews.getWidget(nw_NewsBrowser))->LoadFromHTTP(strNewsPage);
+					if (!strNewsPage.empty())
+						((CBrowser *)cNews.getWidget(nw_NewsBrowser))->LoadFromHTTP(strNewsPage);
 				}
 				break;
 		}

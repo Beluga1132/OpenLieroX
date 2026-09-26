@@ -186,12 +186,12 @@ bool GameOptions::Init() {
 		( tLXOptions->sHttpProxy, "Network.HttpProxy", "" )
 		( tLXOptions->bAutoSetupHttpProxy, "Network.AutoSetupHttpProxy", true )
 
-		( tLXOptions->bEnableChat, "Network.EnableChat", true )
+		( tLXOptions->bEnableChat, "Network.EnableChat", false )
 		( tLXOptions->bEnableMiniChat, "Network.EnableMiniChat", true )
 		( tLXOptions->sServerName, "Network.ServerName", "OpenLieroX Server" )
 		( tLXOptions->sWelcomeMessage, "Network.WelcomeMessage", "Welcome to <server>, <player>" )
 		( tLXOptions->sServerPassword, "Network.Password", "" )
-		( tLXOptions->bRegServer, "Network.RegisterServer", true )
+		( tLXOptions->bRegServer, "Network.RegisterServer", false )
 		( tLXOptions->bAllowWantsJoinMsg, "Network.AllowWantsJoinMsg", true )
 		( tLXOptions->bWantsJoinBanned, "Network.WantsToJoinFromBanned", true )
 		( tLXOptions->bAllowRemoteBots, "Network.AllowRemoteBots", true )
@@ -262,7 +262,7 @@ bool GameOptions::Init() {
 #else
 																		false )
 #endif
-		( tLXOptions->bCheckForUpdates, "Advanced.CheckForUpdates", true )
+		( tLXOptions->bCheckForUpdates, "Advanced.CheckForUpdates", false )
 
 		( tLXOptions->bLogConvos, "Misc.LogConversations", false )
 		( tLXOptions->bShowPing, "Misc.ShowPing", true )

@@ -224,6 +224,7 @@ public:
 	bool		requestFilesPending(); // Re-send file request if downloading fails
 	void		removeFileFromRequest( const std::string & path );
 	static bool	isPathValid( const std::string & path );	// Check if someone tries to access /etc/shadow to get system passwords
+	static bool	isPathServable( const std::string & path );	// Valid, and a map or the current mod
 	
 	struct		StatInfo
 	{
