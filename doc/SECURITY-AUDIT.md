@@ -1,16 +1,26 @@
 # Security audit (fork baseline)
 
 Scope: upstream `albertz/openlierox` master at `d1ad953f4`,
-plus the `strip-call-home` branch.
-Method: targeted code review of the network-facing attack surface
+plus the changes made on top of it in this fork.
+
+Round 1: targeted code review of the network-facing attack surface
 (packet parsing, peer file transfer, chat rendering, mod scripting, map loading, HTTP),
-plus a pattern sweep of the whole tree.
-Not done: fuzzing, and live exploitation.
-The headless tests and a live repro need IPv6 sockets,
-which the audit sandbox lacked,
-so findings 1 to 3 were found by reading the code.
-Their fixes were then tested by compiling the changed functions on their own
-(see each finding).
+plus a pattern sweep of the whole tree (findings 1 to 7).
+
+Round 2 (findings 8 onward):
+- the headless suite under AddressSanitizer and UndefinedBehaviorSanitizer;
+- mutation fuzzing of level files (LX and Teeworlds) through a sanitized server,
+  and of network traffic through a proxy that corrupts packets
+  between a sanitized server and client;
+- the bundled libraries checked against their upstream releases and known CVEs;
+- a review of the Gusanos network code,
+  of zip and image loading, of every unsafe C string call and of the libxml2 parse options;
+- cppcheck and semgrep over `src/`, `libs/hawknl` and `libs/lua`, with each hit triaged.
+
+The audit sandbox has no IPv6, which the game's sockets need,
+so round 2 ran the game through a test-only LD_PRELOAD shim
+that maps its IPv6 sockets to IPv4.
+CI runs the same tests on real IPv6.
 
 ## Findings
 
@@ -84,7 +94,8 @@ Their fixes were then tested by compiling the changed functions on their own
 
 - 39 uses of `sprintf`, `strcpy` and similar, mostly formatting numbers into fixed buffers,
   or in crash and debug code.
-  No exploitable case found in the sample reviewed.
+  All reviewed in round 2: every one is bounded,
+  except in the unused desktop crash-reporter hooks (see finding 15).
   Replace opportunistically, as CONTRIBUTING.md already asks.
 
 ### 6. Info: CI workflows target upstream infrastructure
@@ -102,6 +113,83 @@ Their fixes were then tested by compiling the changed functions on their own
   style and shell-command hygiene only, with no hooks, no MCP config,
   no hidden Unicode, and no instructions to fetch or run anything.
 
+### 8. High: memory corruption in the bundled Lua (CVE-2014-5461 and 5.1.5 fixes)
+
+- The bundled Lua was stock 5.1.4.
+  CVE-2014-5461 (stack overflow in vararg functions) is reachable from any mod script:
+  a test script gives a heap buffer overflow under ASan on 5.1.4.
+  5.1.5 also fixes use-after-rehash in `settable`,
+  the parser collecting a prototype it is still building,
+  and `string.format` reading missing arguments.
+- **Fixed:** `libs/lua` is now 5.1.5 (verified against the official tarball's MD5)
+  plus the upstream CVE-2014-5461 fix (via Debian/Ubuntu),
+  keeping the binary chunk rejection from finding 3.
+  The same script now runs cleanly.
+
+### 9. Medium: out-of-bounds reads from Gusanos network events
+
+- `Encoding::decode(stream, n)` reads enough bits for `n - 1`,
+  so a peer can send any value up to the next power of two.
+  The `eHole` level effect (`gusgame.cpp`) and the particle node request (`client.cpp`)
+  used that value as a vector index unchecked, and used the result as a pointer.
+- **Fixed:** both are range-checked, like the other callers.
+
+### 10. Medium: huge allocations and an out-of-bounds write from level headers
+
+- The LX loader allocated from the header's width, height and data sizes as given,
+  before any check (up to tens of GB),
+  and at huge widths `CMap::TileMap` overflowed its pixel arithmetic
+  and wrote out of bounds (SIGSEGV).
+  Levels download automatically when you join a server.
+  Found by fuzzing level files.
+- **Fixed:** the header must be at most 8192 per side and 4096x4096 in area
+  (the largest shipped level is 1260x750),
+  and the image data sizes must match `width * height * 7`.
+  All 158 shipped image-format levels still load.
+
+### 11. Medium: crash when a level fails to load
+
+- Starting a game on a level that fails to load,
+  while the host's local client was still connecting,
+  left that client without a channel,
+  and `CClient::SendPackets` dereferenced it on the next frame.
+  Found by fuzzing; `ReadPackets` already had the check.
+- **Fixed**, with `tests/headless/test_bad_map.py`,
+  which crashes the old code every time.
+
+### 12. Low: decompression bomb in peer file transfers
+
+- `Decompress` grew its output without limit,
+  and it unpacks data sent by peers,
+  so a few KB could expand to gigabytes.
+- **Fixed:** output is capped at 128 MB, with unit tests.
+
+### 13. Low: downloaded mod zips could write outside the mod directory
+
+- The mod name comes from the server and was not validated,
+  and zip entries only had to start with it,
+  so `Classic2/...` or a mod named `cfg` could create new files elsewhere under `~/.OpenLieroX`
+  (existing files were never overwritten).
+  Only reachable with an HTTP download server configured, which this fork ships without.
+- **Fixed:** the name must be one valid directory name,
+  and entries must be under `<mod>/` and pass the UDP download path check.
+
+### 14. Low: predictable connection challenges
+
+- Challenges were `(rand() << 16) ^ rand()`:
+  predictable, which weakens them against spoofed source addresses,
+  and the shift overflowed a signed int (UBSan).
+- **Fixed:** drawn from `std::random_device`.
+
+### 15. Info: smaller issues found by the tools
+
+- Unused desktop crash-reporter hooks (never installed) would have mailed reports upstream
+  and copied the 39-character version string into a 32-byte stack buffer: removed.
+- Two functions fell off the end without returning (cppcheck),
+  and a Gusanos enum was given a value outside its range (UBSan): fixed.
+- Everything else cppcheck and semgrep reported was style,
+  or a false positive in stock Lua or HawkNL code.
+
 ## Reviewed and found sound
 
 - `CBytestream` reads are bounds-checked (they return 0 past the end).
@@ -110,10 +198,24 @@ Their fixes were then tested by compiling the changed functions on their own
   Client-side lookups go through `Game::wormById`, a map lookup.
 - HTTP uses libcurl with TLS verification on (native CA store).
 - The Teeworlds map loader validates header sizes with 64-bit arithmetic
-  and bounds-checks item indices.
-  Maps download automatically on join, so fuzzing it is still worthwhile.
+  and bounds-checks item indices;
+  fuzzing it found no memory errors.
 - Breakpad crash upload is off by default,
   and the crash handler makes no network calls.
+- The headless suite runs clean under ASan and UBSan, with the fixes above.
+- libxml2 parses chat and news HTML without DTD loading or entity substitution,
+  so it cannot read local files or reach the network.
+- Images go to the system SDL_image and libgd,
+  and on Linux libzip comes from the system too:
+  keep the system packages updated.
+- HawkNL 1.68 has no published CVEs; it is abandoned,
+  so it was covered by the network fuzzing instead.
+- Fuzzing, after the fixes above:
+  881 mutated levels loaded by a sanitized server with no memory errors
+  (after 1474 in the first pass, which found findings 10 and 11),
+  and 14 networked games with about 150,000 packets, 7,572 of them corrupted,
+  with no crash or sanitizer report on either the server or the client.
+  Slow Teeworlds loads under ASan (6 seconds without it) were the only timeouts.
 
 ## Outbound connections removed on `strip-call-home`
 
