@@ -8,8 +8,9 @@ plus a pattern sweep of the whole tree.
 Not done: fuzzing, and live exploitation.
 The headless tests and a live repro need IPv6 sockets,
 which the audit sandbox lacked,
-so findings 1 to 3 are confirmed by reading the code,
-not by running an exploit.
+so findings 1 to 3 were found by reading the code.
+Their fixes were then tested by compiling the changed functions on their own
+(see each finding).
 
 ## Findings
 
@@ -24,8 +25,12 @@ not by running an exploit.
   becomes a link, and clicking it runs the command.
   `<a href="...">` in chat works too,
   since `HtmlEntityUnpairedBrackets` escapes only unpaired brackets.
-- Fix: launch the browser with `fork` + `execvp("xdg-open", {url})` (no shell),
-  and accept only `http://` and `https://` URLs.
+- **Fixed:** the browser is started with `fork` + `execlp` (no shell),
+  with the URL as its only argument,
+  and only `http://` and `https://` URLs without whitespace are opened (all platforms).
+  Verified: the old code ran `touch` from `http://x/;touch${IFS}FILE`;
+  the new code passes that URL through as one literal argument,
+  and refuses `file://` URLs.
 
 ### 2. High: remote file read from the host's working directory
 
@@ -40,9 +45,12 @@ not by running an exploit.
   When the game is started from `$HOME` (common for desktop launchers),
   a malicious client can download files from your home directory.
   `logs/` (chat and IP logs) is readable from any search path.
-- Fix: allow requests only under `levels/` and mod directories,
-  reject any path component starting with `.`,
-  and drop `"."` from the search paths.
+- **Fixed:** `isPathValid` now rejects a leading `.` too,
+  and `GET:` / `STAT:` only serve `levels/...` and the current mod's directory
+  (`isPathServable`).
+  `"."` stays a search path, since running from the game dir relies on it.
+  Verified against `.ssh/id_rsa`, `.aws/credentials`, `logs/...`, `Documents/...` and `..` paths
+  (all refused), and maps and current-mod files (still served).
 
 ### 3. High: native code execution from a downloaded mod (Lua bytecode)
 
@@ -52,8 +60,12 @@ not by running an exploit.
   and the base library still exposes `loadstring`, `load`, `loadfile` and `dofile`.
 - Malicious Lua 5.1 bytecode is a well-known route to memory corruption and code execution.
   Mods can be downloaded from a server you join (one click in the join menu).
-- Fix: reject chunks that start with `\x1b` (`LUA_SIGNATURE`) in the loader,
-  and remove `load`, `loadstring`, `loadfile` and `dofile` from the global table.
+- **Fixed:** the bundled Lua loader (`libs/lua/ldo.c`) rejects binary chunks,
+  covering `lua_load`, `loadstring` and `load`,
+  and `dofile` / `loadfile` are removed from the mod environment.
+  None of the shipped `.lua` files are bytecode.
+  Verified: `loadstring(string.dump(f))` now fails with "binary chunks are not allowed".
+  Building with `LIBLUA_BUILTIN=OFF` uses the system Lua and loses this protection.
 
 ### 4. Medium: admin password sent in plaintext, no brute-force limit
 
